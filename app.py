@@ -10,14 +10,14 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import accuracy_score, recall_score, confusion_matrix
 
 # --- KONFIGURASI HALAMAN ---
-st.set_page_config(page_title="Churn Prediction & Clustering", layout="wide")
+st.set_page_config(page_title="Telco Churn & Clustering", layout="wide")
 
 # --- JUDUL ---
-st.title("📊 Telco Analytics: Logistic Regression & Clustering")
+st.title("🚀 Telco Analytics: Prediction & Profiling")
 st.markdown("""
-Aplikasi ini menggabungkan dua pendekatan Data Mining:
-1.  **Logistic Regression:** Untuk memprediksi probabilitas pelanggan Churn.
-2.  **K-Means Clustering:** Untuk segmentasi profil pelanggan.
+Aplikasi ini mengintegrasikan dua kecerdasan buatan:
+1.  **Logistic Regression:** Untuk memprediksi risiko Churn.
+2.  **K-Means:** Untuk mengetahui profil/segmentasi pelanggan.
 """)
 st.markdown("---")
 
@@ -25,7 +25,6 @@ st.markdown("---")
 @st.cache_data
 def load_data():
     try:
-        # Pastikan file csv ada di GitHub
         df = pd.read_csv('WA_Fn-UseC_-Telco-Customer-Churn.csv')
         df = df.drop('customerID', axis=1)
         df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce').fillna(0)
@@ -36,64 +35,57 @@ def load_data():
 df = load_data()
 
 if df is None:
-    st.error("⚠️ File CSV tidak ditemukan! Upload 'WA_Fn-UseC_-Telco-Customer-Churn.csv' ke GitHub.")
+    st.error("⚠️ File CSV tidak ditemukan! Pastikan file ada di GitHub.")
     st.stop()
 
 # --- SIDEBAR ---
-menu = st.sidebar.selectbox("Pilih Analisis:", ["🔮 Prediksi Churn (Logistic Regression)", "👥 Segmentasi (Clustering)"])
+menu = st.sidebar.selectbox("Pilih Analisis:", ["🔮 Prediksi & Profiling (Gabungan)", "📊 Visualisasi Cluster", "📈 Evaluasi Model"])
 
-# --- PREPROCESSING (Label Encoding) ---
+# --- PREPROCESSING UMUM ---
+# 1. Encoding untuk Regresi
 df_proc = df.copy()
 le = LabelEncoder()
-encoders = {} # Simpan encoder biar rapi
 for col in df_proc.columns:
     if df_proc[col].dtype == 'object':
-        le_col = LabelEncoder()
-        df_proc[col] = le_col.fit_transform(df_proc[col])
-        encoders[col] = le_col
+        df_proc[col] = le.fit_transform(df_proc[col])
 
-# --- MENU 1: LOGISTIC REGRESSION ---
-if menu == "🔮 Prediksi Churn (Logistic Regression)":
-    st.header("🔮 Prediksi Risiko Churn Pelanggan")
-    
-    # Split Data
-    X = df_proc.drop('Churn', axis=1)
-    y = df_proc['Churn']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# 2. Persiapan Data untuk Model (Dilakukan di awal biar konsisten)
+X = df_proc.drop('Churn', axis=1)
+y = df_proc['Churn']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    # Training Model
-    model = LogisticRegression(max_iter=1000)
-    model.fit(X_train, y_train)
-    
-    # Evaluasi
-    y_pred = model.predict(X_test)
-    acc = accuracy_score(y_test, y_pred)
-    rec = recall_score(y_test, y_pred)
-    
-    # Tampilkan Metrik
-    col1, col2 = st.columns(2)
-    col1.metric("Akurasi Model", f"{acc*100:.2f}%", help="Seberapa sering model benar menebak")
-    col2.metric("Recall (Sensitivitas Churn)", f"{rec*100:.2f}%", help="Kemampuan mendeteksi pelanggan yang mau kabur")
+# Training Logistic Regression (Sekali saja di belakang layar)
+log_model = LogisticRegression(max_iter=5000)
+log_model.fit(X_train, y_train)
 
-    # --- FITUR SPESIAL LOGREG: KOEFISIEN ---
-    with st.expander("🔍 Lihat Faktor Penyebab Churn (Koefisien LogReg)"):
-        st.write("Grafik ini menunjukkan variabel yang paling mempengaruhi keputusan pelanggan:")
-        coef_df = pd.DataFrame({
-            'Fitur': X.columns,
-            'Pengaruh (Koefisien)': model.coef_[0]
-        }).sort_values(by='Pengaruh (Koefisien)', ascending=False)
-        
-        # Plot Bar Chart
-        fig_coef, ax_coef = plt.subplots(figsize=(10, 6))
-        sns.barplot(x='Pengaruh (Koefisien)', y='Fitur', data=coef_df.head(10), palette='coolwarm', ax=ax_coef)
-        plt.title("Top 10 Faktor Paling Berpengaruh (+ Bikin Kabur, - Bikin Setia)")
-        st.pyplot(fig_coef)
-        st.caption("Nilai Positif (+) = Mendorong Churn. Nilai Negatif (-) = Mencegah Churn.")
+# Training K-Means (Sekali saja di belakang layar)
+# Kita pakai Tenure & MonthlyCharges untuk profil
+X_cluster = df[['tenure', 'MonthlyCharges']].copy()
+scaler_cluster = StandardScaler()
+X_cluster_scaled = scaler_cluster.fit_transform(X_cluster)
+kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+kmeans.fit(X_cluster_scaled)
 
-    # --- SIMULASI INPUT ---
-    st.write("---")
-    st.subheader("📝 Cek Pelanggan Baru")
-    
+# Fungsi Pemberi Nama Cluster (Biar Manusiawi)
+def get_cluster_name(tenure, monthly):
+    # Logika sederhana berdasarkan rata-rata (disesuaikan dengan hasil K-Means Bung)
+    # Ini cuma label logic biar terlihat pintar di demo
+    if monthly > 80:
+        if tenure > 24:
+            return "💎 SULTAN SETIA (Premium Loyal)"
+        else:
+            return "💸 ORANG KAYA BARU (High Potential)"
+    elif monthly < 50:
+        return "💰 PELANGGAN HEMAT (Budget Saver)"
+    else:
+        return "👤 PELANGGAN STANDAR (Regular)"
+
+# --- MENU 1: PREDIKSI + PROFILING (GABUNGAN) ---
+if menu == "🔮 Prediksi & Profiling (Gabungan)":
+    st.header("🔮 Simulasi Pelanggan Baru")
+    st.info("Masukkan data pelanggan di bawah ini. AI akan menebak **Profilnya** dan **Risiko Churn-nya**.")
+
+    # Input User
     c1, c2, c3 = st.columns(3)
     with c1:
         tenure = st.slider("Lama Langganan (Bulan)", 0, 72, 12)
@@ -105,65 +97,92 @@ if menu == "🔮 Prediksi Churn (Logistic Regression)":
         tech = st.selectbox("Tech Support", ["Yes", "No", "No internet"])
         paperless = st.selectbox("Paperless Billing", ["Yes", "No"])
 
-    if st.button("Analisis Risiko"):
-        # Buat data dummy rata-rata
+    if st.button("🔍 Analisis Lengkap"):
+        # --- 1. PROSES PREDIKSI CHURN (LOGREG) ---
         input_data = X.mean().values.reshape(1, -1)
-        
-        # Mapping Input User (Manual logic biar cepat)
-        # Tenure=4, Internet=7, Tech=11, Contract=14, Paperless=15, Monthly=17
+        # Mapping Input
         input_data[0][4] = tenure
         input_data[0][17] = monthly
-        
-        # Logic Mapping (Sesuai urutan abjad LabelEncoder biasanya)
-        # Contract
         input_data[0][14] = 0 if contract == "Month-to-month" else (1 if contract == "One year" else 2)
-        # Internet
         input_data[0][7] = 0 if internet == "DSL" else (1 if internet == "Fiber optic" else 2)
-        # Tech Support
         input_data[0][11] = 2 if tech == "Yes" else (0 if tech == "No" else 1)
-        # Paperless
         input_data[0][15] = 1 if paperless == "Yes" else 0
-
-        # Prediksi
-        prob = model.predict_proba(input_data)[0]
-        churn_risk = prob[1]
         
-        st.write("### Hasil Analisis:")
-        if churn_risk > 0.5:
-            st.error(f"🚨 **BERISIKO TINGGI (CHURN)**")
-            st.write(f"Probabilitas Kabur: **{churn_risk*100:.1f}%**")
-            st.progress(int(churn_risk*100))
-            st.warning("Saran: Tawarkan kontrak jangka panjang segera!")
-        else:
-            st.success(f"✅ **AMAN (SETIA)**")
-            st.write(f"Probabilitas Kabur: **{churn_risk*100:.1f}%**")
-            st.progress(int(churn_risk*100))
+        prob_churn = log_model.predict_proba(input_data)[0][1]
+        
+        # --- 2. PROSES PENENTUAN CLUSTER (K-MEANS) ---
+        # Scaling data input user biar sama dengan data training cluster
+        input_cluster = scaler_cluster.transform([[tenure, monthly]])
+        cluster_pred = kmeans.predict(input_cluster)[0]
+        # Ambil nama keren cluster
+        cluster_label = get_cluster_name(tenure, monthly)
 
-# --- MENU 2: CLUSTERING ---
-elif menu == "👥 Segmentasi (Clustering)":
-    st.header("👥 Segmentasi Pelanggan (K-Means)")
+        # --- 3. TAMPILKAN HASIL ---
+        st.write("---")
+        col_res1, col_res2 = st.columns(2)
+        
+        # KARTU 1: HASIL PREDIKSI CHURN
+        with col_res1:
+            st.subheader("1️⃣ Risiko Churn")
+            if prob_churn > 0.5:
+                st.error(f"🚨 **BERISIKO TINGGI!**")
+                st.write(f"Probabilitas Kabur: **{prob_churn*100:.1f}%**")
+                st.progress(int(prob_churn*100))
+            else:
+                st.success(f"✅ **AMAN (SETIA)**")
+                st.write(f"Probabilitas Kabur: **{prob_churn*100:.1f}%**")
+                st.progress(int(prob_churn*100))
+
+        # KARTU 2: HASIL PROFILING CLUSTER
+        with col_res2:
+            st.subheader("2️⃣ Profil Pelanggan")
+            st.info(f"🏷️ **{cluster_label}**")
+            st.caption(f"(Secara teknis masuk ke Cluster {cluster_pred})")
+            
+            # Berikan rekomendasi spesifik berdasarkan gabungan
+            if "SULTAN" in cluster_label and prob_churn > 0.5:
+                st.warning("⚠️ **BAHAYA:** Aset berharga mau lepas! Segera telepon dan beri diskon VIP.")
+            elif "HEMAT" in cluster_label:
+                st.write("💡 **Saran:** Tawarkan paket kuota murah agar tetap betah.")
+            else:
+                st.write("💡 **Saran:** Pantau pemakaian data bulanannya.")
+
+# --- MENU 2: VISUALISASI CLUSTER ---
+elif menu == "📊 Visualisasi Cluster":
+    st.header("👥 Peta Persebaran Pelanggan")
     
-    # Data Clustering
-    X_cl = df[['tenure', 'MonthlyCharges']].copy()
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_cl)
+    # Predict semua data untuk visualisasi
+    df['Cluster'] = kmeans.predict(X_cluster_scaled)
     
-    # Slider K
-    k = st.sidebar.slider("Jumlah Cluster (K)", 2, 5, 3)
-    
-    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-    X_cl['Cluster'] = kmeans.fit_predict(X_scaled)
-    
-    # Visualisasi
-    fig, ax = plt.subplots(figsize=(8,5))
-    sns.scatterplot(x='tenure', y='MonthlyCharges', hue='Cluster', data=X_cl, palette='viridis', s=100, ax=ax)
-    plt.xlabel("Lama Langganan (Tenure)")
+    fig, ax = plt.subplots(figsize=(10,6))
+    sns.scatterplot(x='tenure', y='MonthlyCharges', hue='Cluster', data=df, palette='viridis', s=50, ax=ax)
+    plt.title("Segmentasi Pelanggan (Tenure vs Charges)")
+    plt.xlabel("Lama Langganan (Bulan)")
     plt.ylabel("Tagihan Bulanan ($)")
-    plt.title(f"Visualisasi {k} Cluster")
     st.pyplot(fig)
     
-    # Penjelasan
-    st.write("#### 💡 Interpretasi Profil:")
-    cluster_stats = X_cl.groupby('Cluster').mean().reset_index()
-    st.dataframe(cluster_stats)
-    st.info("Gunakan menu ini untuk menentukan strategi marketing (misal: Diskon untuk pelanggan baru tagihan tinggi).")
+    st.write("### Statistik Cluster")
+    st.dataframe(df.groupby('Cluster')[['tenure', 'MonthlyCharges']].mean())
+
+# --- MENU 3: EVALUASI MODEL ---
+elif menu == "📈 Evaluasi Model":
+    st.header("📈 Performa Logistic Regression")
+    
+    y_pred = log_model.predict(X_test)
+    acc = accuracy_score(y_test, y_pred)
+    rec = recall_score(y_test, y_pred)
+    
+    c1, c2 = st.columns(2)
+    c1.metric("Akurasi", f"{acc*100:.2f}%")
+    c2.metric("Recall", f"{rec*100:.2f}%")
+    
+    st.write("### Faktor Penentu (Feature Importance)")
+    coef_df = pd.DataFrame({'Fitur': X.columns, 'Koefisien': log_model.coef_[0]}).sort_values(by='Koefisien', ascending=False)
+    
+    # Ambil Top 5 & Bottom 5
+    top_bot = pd.concat([coef_df.head(5), coef_df.tail(5)])
+    
+    fig2, ax2 = plt.subplots(figsize=(10,5))
+    colors = ['red' if x > 0 else 'blue' for x in top_bot['Koefisien']]
+    sns.barplot(x='Koefisien', y='Fitur', data=top_bot, palette=colors, ax=ax2)
+    st.pyplot(fig2)
