@@ -98,23 +98,43 @@ if menu == "🔮 Prediksi & Profiling (Gabungan)":
         paperless = st.selectbox("Paperless Billing", ["Yes", "No"])
 
     if st.button("🔍 Analisis Lengkap"):
-        # --- 1. PROSES PREDIKSI CHURN (LOGREG) ---
-        input_data = X.mean().values.reshape(1, -1)
-        # Mapping Input
-        input_data[0][4] = tenure
-        input_data[0][17] = monthly
-        input_data[0][14] = 0 if contract == "Month-to-month" else (1 if contract == "One year" else 2)
-        input_data[0][7] = 0 if internet == "DSL" else (1 if internet == "Fiber optic" else 2)
-        input_data[0][11] = 2 if tech == "Yes" else (0 if tech == "No" else 1)
-        input_data[0][15] = 1 if paperless == "Yes" else 0
+        # --- 1. MEMBUAT DATA FRAME INPUT (LEBIH AMAN) ---
+        # Kita ambil rata-rata dulu sebagai base agar kolom lain terisi
+        input_df = pd.DataFrame([X.mean()], columns=X.columns)
         
-        prob_churn = log_model.predict_proba(input_data)[0][1]
+        # Update nilai sesuai input user (Pakai nama kolom, jangan indeks angka)
+        input_df['tenure'] = tenure
+        input_df['MonthlyCharges'] = monthly
         
-        # --- 2. PROSES PENENTUAN CLUSTER (K-MEANS) ---
-        # Scaling data input user biar sama dengan data training cluster
-        input_cluster = scaler_cluster.transform([[tenure, monthly]])
-        cluster_pred = kmeans.predict(input_cluster)[0]
-        # Ambil nama keren cluster
+        # Manual Encoding (Harus sama persis dengan LabelEncoder)
+        # Contract
+        if contract == "Month-to-month": input_df['Contract'] = 0
+        elif contract == "One year": input_df['Contract'] = 1
+        else: input_df['Contract'] = 2
+        
+        # InternetService
+        if internet == "DSL": input_df['InternetService'] = 0
+        elif internet == "Fiber optic": input_df['InternetService'] = 1
+        else: input_df['InternetService'] = 2
+        
+        # TechSupport
+        if tech == "No": input_df['TechSupport'] = 0
+        elif tech == "No internet": input_df['TechSupport'] = 1
+        else: input_df['TechSupport'] = 2
+        
+        # PaperlessBilling
+        input_df['PaperlessBilling'] = 1 if paperless == "Yes" else 0
+        
+        # --- 2. PREDIKSI (LOGREG & K-MEANS) ---
+        # Prediksi Churn
+        prob_churn = log_model.predict_proba(input_df)[0][1]
+        
+        # Prediksi Cluster (Scaling dulu khusus kolom tenure & monthly)
+        input_cluster = input_df[['tenure', 'MonthlyCharges']]
+        input_cluster_scaled = scaler_cluster.transform(input_cluster)
+        cluster_pred = kmeans.predict(input_cluster_scaled)[0]
+        
+        # Labeling Cluster
         cluster_label = get_cluster_name(tenure, monthly)
 
         # --- 3. TAMPILKAN HASIL ---
@@ -139,13 +159,11 @@ if menu == "🔮 Prediksi & Profiling (Gabungan)":
             st.info(f"🏷️ **{cluster_label}**")
             st.caption(f"(Secara teknis masuk ke Cluster {cluster_pred})")
             
-            # Berikan rekomendasi spesifik berdasarkan gabungan
-            if "SULTAN" in cluster_label and prob_churn > 0.5:
-                st.warning("⚠️ **BAHAYA:** Aset berharga mau lepas! Segera telepon dan beri diskon VIP.")
-            elif "HEMAT" in cluster_label:
-                st.write("💡 **Saran:** Tawarkan paket kuota murah agar tetap betah.")
+            # Rekomendasi
+            if prob_churn > 0.5:
+                st.warning("💡 **Action:** Segera tawarkan promo retensi!")
             else:
-                st.write("💡 **Saran:** Pantau pemakaian data bulanannya.")
+                st.success("💡 **Action:** Pertahankan servis yang baik.")
 
 # --- MENU 2: VISUALISASI CLUSTER ---
 elif menu == "📊 Visualisasi Cluster":
